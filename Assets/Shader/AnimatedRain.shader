@@ -65,6 +65,7 @@ Shader "Custom/AnimatedRain" {
 			float4 _RainTransform;
 
 			float _Windy;
+			float _WindDegree;
 
 			float calcSceneDepth(float2 position) {
 				return 100.0f;
@@ -84,10 +85,11 @@ Shader "Custom/AnimatedRain" {
 
 			fixed4 frag(v2f i) : SV_Target{
 				float2 uvRandomFactor = _RainTransform.zw * _Time.y;
+				//uvRandomFactor = 0.0f;
 				float pi = 3.1415926;
-				float radianPerDegree = 180.0f / pi;
+				float radianPerDegree = pi / 180.0f;
 				// windy
-				float2 windRadian = 30 * radianPerDegree;
+				float2 windRadian = _WindDegree * radianPerDegree;
 				float4 cosines = float4(cos(windRadian), sin(windRadian));
 				float2 centeredUV = i.uv - float2(0.5f, 0.5f);
 				float4 rotatedUV = float4(dot(cosines.xz * float2(1.0f, -1.0f), centeredUV)
@@ -103,7 +105,7 @@ Shader "Custom/AnimatedRain" {
 				rotatedUVRandomFactor = rotatedUVRandomFactor * _Windy + uvRandomFactor.xyxy * (1 - _Windy);
 				float4 scaleLayer12 = float4(1.0f, 1.0f, 2.0f, 2.0f) * _RainTransform.xyxy;
 				float4 uvLayer12 = scaleLayer12 * rotatedUV + rotatedUVRandomFactor;
-				float4 scaleLayer34 = float4(4.0f, 4.0f, 8.0f, 8.0f) * _RainTransform.xyxy;
+				float4 scaleLayer34 = float4(3.0f, 3.0f, 4.0f, 4.0f) * _RainTransform.xyxy;
 				float4 uvLayer34 = scaleLayer34 * i.uv.xyxy + uvRandomFactor.xyxy;
 
 				// occlusion of layer12 and mask of layer34
@@ -125,35 +127,19 @@ Shader "Custom/AnimatedRain" {
 				occlusion34.x = rainDepthMapTest(viewPixelDepth, uvLayer34.xy, _RainDepthStart.z, _RainDepthRange.z, _RainOpacities.z);
 				occlusion34.y = rainDepthMapTest(viewPixelDepth, uvLayer34.zw, _RainDepthStart.w, _RainDepthRange.w, _RainOpacities.w);
 
-				// Layer 3
-				// here
-				float2 distoUV = i.uv;
-				float2 noiseUV = tex2D(_DistortionTex, distoUV.xy).xy;
-				noiseUV = noiseUV * i.uv.y * 2.0f + float2(1.5f, 0.7f) * i.uv + float2(0.1f, -0.2f) * _Time.y;
-				float layerMask3 = tex2D(_NoiseTex, noiseUV) + 0.32f;
-				// here
-				float layer1 = 1.0f;
-				layerMask3 = saturate(pow(2.0f * layer1, 2.95f) * 0.6f);
-				//float rainLuminance3 = tex2D(_RainTex, uvLayer34.xy).g;
-				//layerMask3 *= rainLuminance3;
+				// Noise And Distortion
+				float2 noiseAndDistortion;
+				noiseAndDistortion.x = tex2D(_NoiseTex, screenUV);
+				noiseAndDistortion.y = tex2D(_DistortionTex, screenUV);
 
-				// Layer 4
-				//here
-				float2 blendUV = i.uv;
-				float layerMask4 = tex2D(_NoiseTex, blendUV.xy) + 0.37f;
-				layerMask4 = saturate(pow(2.0f * layer1, 2.95f) * 0.6f);
-				//float rainLuminance4 = tex2D(_RainTex, uvLayer34.xy).g;
-				//layerMask4 *= rainLuminance4;
-
-				fixed4 rainPropertyOutput = fixed4(occlusion12.xy, layerMask3 * occlusion34.x, layerMask4 * occlusion34.y);
-				//fixed4 rainPropertyOutput = fixed4(occlusion12.xy, occlusion34.xy);
+				fixed4 rainPropertyOutput = fixed4(occlusion12.xy * noiseAndDistortion, occlusion34 * noiseAndDistortion);
 
 				// Albedo comes from a texture tinted by color
 				float4 values = 1.0f;
-				//values.x = tex2D(_RainTex, uvLayer12.xy).r;
-				//values.y = tex2D(_RainTex, uvLayer12.zw).r;
-				//values.z = tex2D(_RainTex, uvLayer34.xy).r;
-				//values.w = tex2D(_RainTex, uvLayer34.zw).r;
+				values.x = tex2D(_RainTex, uvLayer12.xy).r;
+				values.y = tex2D(_RainTex, uvLayer12.zw).r;
+				values.z = tex2D(_RainTex, uvLayer34.xy).r;
+				values.w = tex2D(_RainTex, uvLayer34.zw).r;
 
 				float3 outColor = dot(values, rainPropertyOutput).xxx;
 				outColor = outColor * 0.09f * _RainIntensity;

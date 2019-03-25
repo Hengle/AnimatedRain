@@ -23,6 +23,7 @@ public class AnimatedRain : MonoBehaviour
     //[Range(0f, 2f)]
     public float rainIntensity = 1.0f;
     public bool isWindy = false;
+    public float windDegree = 30.0f;
 
 
     //[Range(0.25f, 4f)]
@@ -70,6 +71,7 @@ public class AnimatedRain : MonoBehaviour
 
         float windy = isWindy ? 1.0f : 0.0f;
         deferredCmds.SetGlobalFloat("_Windy", windy);
+        deferredCmds.SetGlobalFloat("_WindDegree", windDegree);
 
 
         //deferredCmds.SetGlobalFloat("_LightExponent", lightExponent);
